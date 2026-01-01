@@ -11,6 +11,15 @@ A mobile-first physics-based game where you shoot a bouncy ball with a slingshot
   - Bullseye (Gold): 50 points
   - Middle Ring (White): 25 points
   - Outer Ring (Red): 10 points
+- **Sound Effects**: Dynamic audio using Web Audio API
+  - Slingshot stretch sounds
+  - Launch whoosh
+  - Bounce sounds on collisions
+  - Different hit sounds based on target value
+- **Particle Effects**: Colorful explosions on impacts
+  - Launch particles when shooting
+  - Target hit explosions with different colors
+  - Bounce particles on obstacle collisions
 - **Obstacles**: Bounce off platforms to reach the target
 - **Mobile-First Design**: Optimized for touch screens
 - **Responsive**: Works on desktop and mobile devices
@@ -44,6 +53,8 @@ A mobile-first physics-based game where you shoot a bouncy ball with a slingshot
 - Maximum drag distance of 100px for balance
 - Auto-reset when ball stops moving
 - Collision detection with targets and obstacles
+- Procedural sound generation using Web Audio API
+- Dynamic particle system with physics-based movement
 
 ## Future Enhancements
 
@@ -52,9 +63,9 @@ A mobile-first physics-based game where you shoot a bouncy ball with a slingshot
 - Moving targets
 - Wind effects
 - Power-ups
-- High score tracking
-- Sound effects
-- Particle effects on collision
+- High score tracking and leaderboards
+- Background music
+- Mobile haptic feedback
 
 ## License
 

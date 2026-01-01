@@ -26,9 +26,161 @@ const slingshotX = 150;
 const slingshotY = 400;
 const maxDragDistance = 100;
 
+// Particle system
+let particles = [];
+
+// Audio context for sound effects
+let audioContext;
+let isSoundEnabled = true;
+
+// ===== SOUND SYSTEM =====
+function initAudio() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+        console.log('Web Audio API not supported');
+        isSoundEnabled = false;
+    }
+}
+
+function playSound(type, intensity = 1) {
+    if (!isSoundEnabled || !audioContext) return;
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const now = audioContext.currentTime;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    switch(type) {
+        case 'stretch':
+            // Elastic stretch sound
+            oscillator.frequency.setValueAtTime(200 + intensity * 100, now);
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.1 * intensity, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+            oscillator.start(now);
+            oscillator.stop(now + 0.1);
+            break;
+
+        case 'launch':
+            // Whoosh sound
+            oscillator.frequency.setValueAtTime(400, now);
+            oscillator.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+            oscillator.type = 'sawtooth';
+            gainNode.gain.setValueAtTime(0.3, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            oscillator.start(now);
+            oscillator.stop(now + 0.3);
+            break;
+
+        case 'bounce':
+            // Bounce sound
+            oscillator.frequency.setValueAtTime(150 + intensity * 200, now);
+            oscillator.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+            oscillator.type = 'triangle';
+            gainNode.gain.setValueAtTime(0.2 * intensity, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+            oscillator.start(now);
+            oscillator.stop(now + 0.1);
+            break;
+
+        case 'hit_low':
+            // Low score hit
+            oscillator.frequency.setValueAtTime(300, now);
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.3, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            oscillator.start(now);
+            oscillator.stop(now + 0.2);
+            break;
+
+        case 'hit_medium':
+            // Medium score hit
+            oscillator.frequency.setValueAtTime(450, now);
+            oscillator.frequency.setValueAtTime(600, now + 0.05);
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.35, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+            oscillator.start(now);
+            oscillator.stop(now + 0.25);
+            break;
+
+        case 'hit_high':
+            // High score hit - victorious sound
+            oscillator.frequency.setValueAtTime(500, now);
+            oscillator.frequency.setValueAtTime(700, now + 0.05);
+            oscillator.frequency.setValueAtTime(900, now + 0.1);
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.4, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            oscillator.start(now);
+            oscillator.stop(now + 0.4);
+            break;
+    }
+}
+
+// ===== PARTICLE SYSTEM =====
+class Particle {
+    constructor(x, y, color, velocity) {
+        this.x = x;
+        this.y = y;
+        this.vx = velocity.x + (Math.random() - 0.5) * 4;
+        this.vy = velocity.y + (Math.random() - 0.5) * 4;
+        this.life = 1.0;
+        this.decay = 0.015 + Math.random() * 0.015;
+        this.size = 3 + Math.random() * 4;
+        this.color = color;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.2; // gravity
+        this.vx *= 0.98; // air resistance
+        this.life -= this.decay;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size * this.life, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    isDead() {
+        return this.life <= 0;
+    }
+}
+
+function createExplosion(x, y, color, count = 20, velocity = {x: 0, y: 0}) {
+    for (let i = 0; i < count; i++) {
+        particles.push(new Particle(x, y, color, velocity));
+    }
+}
+
+function updateParticles(ctx) {
+    // Update and draw particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw(ctx);
+
+        if (particles[i].isDead()) {
+            particles.splice(i, 1);
+        }
+    }
+}
+
 // Initialize the game
 function init() {
     canvas = document.getElementById('gameCanvas');
+
+    // Initialize audio
+    initAudio();
 
     // Set canvas size based on viewport
     const width = Math.min(800, window.innerWidth - 40);
@@ -278,6 +430,12 @@ function handleMove(e) {
         pos.y = slingshotY + Math.sin(angle) * maxDragDistance;
     }
 
+    // Play stretch sound based on distance
+    const stretchIntensity = Math.min(distance / maxDragDistance, 1);
+    if (Math.random() > 0.9) { // Only play occasionally to avoid spam
+        playSound('stretch', stretchIntensity);
+    }
+
     // Update ball position
     Body.setPosition(ball, { x: pos.x, y: pos.y });
     Body.setVelocity(ball, { x: 0, y: 0 });
@@ -301,6 +459,15 @@ function handleEnd(e) {
 
     Body.applyForce(ball, ball.position, launchForce);
     slingshotConstraint.bodyB = null;
+
+    // Play launch sound
+    playSound('launch');
+
+    // Create launch particle effect
+    createExplosion(ball.position.x, ball.position.y, '#FF6B6B', 15, {
+        x: -launchForce.x * 20,
+        y: -launchForce.y * 20
+    });
 }
 
 function update() {
@@ -317,6 +484,10 @@ function update() {
             }, 1000);
         }
     }
+
+    // Update and draw particles
+    const ctx = canvas.getContext('2d');
+    updateParticles(ctx);
 
     // Draw trajectory preview
     if (isDragging && !isLaunched) {
@@ -374,26 +545,55 @@ function handleCollision(event) {
     pairs.forEach(pair => {
         const { bodyA, bodyB } = pair;
 
-        // Check if ball hit a target
-        if ((bodyA.label === 'ball' || bodyB.label === 'ball')) {
-            const target = bodyA.label.startsWith('target') ? bodyA :
-                          bodyB.label.startsWith('target') ? bodyB : null;
+        // Get the ball from the collision
+        const ballBody = bodyA.label === 'ball' ? bodyA : bodyB.label === 'ball' ? bodyB : null;
+        const otherBody = bodyA.label === 'ball' ? bodyB : bodyA;
 
-            if (target && target.points) {
+        if (!ballBody) return;
+
+        // Calculate collision intensity based on velocity
+        const speed = Math.sqrt(ballBody.velocity.x ** 2 + ballBody.velocity.y ** 2);
+        const intensity = Math.min(speed / 20, 1);
+
+        // Check if ball hit a target
+        if (otherBody.label && otherBody.label.startsWith('target')) {
+            if (otherBody.points) {
                 // Award points
-                score += target.points;
+                score += otherBody.points;
                 updateHUD();
 
                 // Visual feedback
-                flashTarget(target);
+                flashTarget(otherBody);
+
+                // Sound effect based on target value
+                if (otherBody.points >= 50) {
+                    playSound('hit_high');
+                    createExplosion(ballBody.position.x, ballBody.position.y, '#FFD700', 30, ballBody.velocity);
+                } else if (otherBody.points >= 25) {
+                    playSound('hit_medium');
+                    createExplosion(ballBody.position.x, ballBody.position.y, '#FFFFFF', 25, ballBody.velocity);
+                } else {
+                    playSound('hit_low');
+                    createExplosion(ballBody.position.x, ballBody.position.y, '#FF4444', 20, ballBody.velocity);
+                }
 
                 // Remove the target's scoring ability temporarily
-                const points = target.points;
-                target.points = 0;
+                const points = otherBody.points;
+                otherBody.points = 0;
                 setTimeout(() => {
-                    target.points = points;
+                    otherBody.points = points;
                 }, 1000);
             }
+        } else if (intensity > 0.3) {
+            // Bounce sound for non-target collisions
+            playSound('bounce', intensity);
+
+            // Small particle effect for bounces
+            const color = otherBody.render?.fillStyle || '#4ECDC4';
+            createExplosion(ballBody.position.x, ballBody.position.y, color, 8, {
+                x: ballBody.velocity.x * 0.5,
+                y: ballBody.velocity.y * 0.5
+            });
         }
     });
 }
